@@ -1,0 +1,62 @@
+# .github/workflows/ci-cd.yaml
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  ci-cd:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.8'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+      with:
+        project_id: your-project-id
+        export_default_credentials: true
+
+    - name: Run Data Processing
+      run: python data_processing.py
+
+    - name: Evaluate Model
+      id: evaluate
+      run: python evaluate_model.py
+
+    - name: Check Evaluation Result
+      if: failure()
+      run: echo "Retraining is required."
+
+    - name: Trigger Retraining
+      if: failure()
+      run: |
+        curl -X POST https://us-east4-project-demo-1-439713.cloudfunctions.net/retrain_model
+
+    - name: Build and Push Docker Image
+      if: failure()
+      env:
+        PROJECT_ID: your-project-id
+        REGION: us-east4
+      run: |
+        gcloud auth configure-docker ${REGION}-docker.pkg.dev
+        docker build -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/my-repo/model:latest .
+        docker push ${REGION}-docker.pkg.dev/${PROJECT_ID}/my-repo/model:latest
