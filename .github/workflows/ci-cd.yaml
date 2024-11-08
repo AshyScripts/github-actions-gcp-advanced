@@ -38,14 +38,17 @@ jobs:
 
     - name: Evaluate Model
       id: evaluate
-      run: python evaluate_model.py
-
-    - name: Check Evaluation Result
-      if: failure()
-      run: echo "Retraining is required."
+      continue-on-error: true
+      run: |
+        EVAL_OUTPUT=$(python evaluate_model.py 2>&1)
+        echo "$EVAL_OUTPUT"
+        if echo "$EVAL_OUTPUT" | grep -q "Accuracy below threshold\|No existing model found"; then
+          echo "RETRAIN=true" >> $GITHUB_ENV
+          exit 1
+        fi
 
     - name: Trigger Retraining
-      if: failure()
+      if: env.RETRAIN == 'true'
       run: |
         ACCESS_TOKEN=$(gcloud auth print-identity-token)
         curl -X POST \
@@ -56,11 +59,17 @@ jobs:
           https://us-east4-project-demo-1-439713.cloudfunctions.net/retrain_model
 
     - name: Build and Push Docker Image
-      if: failure()
+      if: env.RETRAIN == 'true'
       env:
         PROJECT_ID: project-demo-1-439713
         REGION: us-east4
+        REPOSITORY: model-docker-registry
       run: |
-        gcloud auth configure-docker ${REGION}-docker.pkg.dev
-        docker build -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/model-docker-registry/model:latest .
-        docker push ${REGION}-docker.pkg.dev/${PROJECT_ID}/model-docker-registry/model:latest
+        # Configure docker to use gcloud credentials
+        gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
+        
+        # Build the image
+        docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/model:latest .
+        
+        # Push the image
+        docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/model:latest
