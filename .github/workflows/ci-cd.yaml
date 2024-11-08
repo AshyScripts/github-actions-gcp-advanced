@@ -1,5 +1,3 @@
-# .github/workflows/ci-cd.yaml
-
 name: CI/CD Pipeline
 
 on:
@@ -49,14 +47,19 @@ jobs:
     - name: Trigger Retraining
       if: failure()
       run: |
-        curl -X POST https://us-east4-project-demo-1-439713.cloudfunctions.net/retrain_model
+        # Get the access token
+        ACCESS_TOKEN=$(gcloud auth print-identity-token)
+        # Use the token in the curl request
+        curl -X POST \
+          -H "Authorization: Bearer $ACCESS_TOKEN" \
+          https://us-east4-project-demo-1-439713.cloudfunctions.net/retrain_model
 
     - name: Build and Push Docker Image
       if: failure()
       env:
-        PROJECT_ID: your-project-id
+        PROJECT_ID: project-demo-1-439713
         REGION: us-east4
       run: |
         gcloud auth configure-docker ${REGION}-docker.pkg.dev
-        docker build -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/my-repo/model:latest .
-        docker push ${REGION}-docker.pkg.dev/${PROJECT_ID}/my-repo/model:latest
+        docker build -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/model-docker-registry/model:latest .
+        docker push ${REGION}-docker.pkg.dev/${PROJECT_ID}/model-docker-registry/model:latest
