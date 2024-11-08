@@ -169,3 +169,5 @@ model.joblib
 
 # Ignore steps.txt file
 steps.txt
+
+.DS_Store
