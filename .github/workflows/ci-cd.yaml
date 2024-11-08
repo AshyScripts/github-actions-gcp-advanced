@@ -47,11 +47,12 @@ jobs:
     - name: Trigger Retraining
       if: failure()
       run: |
-        # Get the access token
         ACCESS_TOKEN=$(gcloud auth print-identity-token)
-        # Use the token in the curl request
         curl -X POST \
           -H "Authorization: Bearer $ACCESS_TOKEN" \
+          -H "Content-Type: application/json" \
+          --max-time 30 \
+          --verbose \
           https://us-east4-project-demo-1-439713.cloudfunctions.net/retrain_model
 
     - name: Build and Push Docker Image
