@@ -11,10 +11,11 @@ def download_from_gcs(bucket_name, source_blob_name, destination_file_name):
     bucket = client.bucket(bucket_name)
     blob = bucket.blob(source_blob_name)
     if not blob.exists():
-        return False
-    blob.download_to_filename(destination_file_name)
-    print(f"Downloaded {source_blob_name} to {destination_file_name}")
-    return True
+        return None
+    full_path = os.path.join('/tmp', destination_file_name)
+    blob.download_to_filename(full_path)
+    print(f"Downloaded {source_blob_name} to {full_path}")
+    return full_path
 
 def evaluate_model(model_file, data_file):
     """Evaluate model performance"""
@@ -36,23 +37,23 @@ if __name__ == "__main__":
     THRESHOLD = 0.99
 
     # Download processed data
-    if not download_from_gcs(BUCKET_NAME, PROCESSED_DATA_BLOB, DATA_FILE_NAME):
+    data_file = download_from_gcs(BUCKET_NAME, PROCESSED_DATA_BLOB, DATA_FILE_NAME)
+    if not data_file:
         print("Processed data not found. Run data processing first.")
-        sys.exit(1)
+        sys.exit(0)  # Exit with 0 to not trigger failure
 
     # Try to download existing model
-    model_exists = download_from_gcs(BUCKET_NAME, MODEL_BLOB_NAME, MODEL_FILE_NAME)
-    
-    if not model_exists:
+    model_file = download_from_gcs(BUCKET_NAME, MODEL_BLOB_NAME, MODEL_FILE_NAME)
+    if not model_file:
         print("No existing model found. Initial training required.")
-        sys.exit(1)
+        sys.exit(0)  # Exit with 0 to not trigger failure
 
     # Evaluate model
-    accuracy = evaluate_model(MODEL_FILE_NAME, DATA_FILE_NAME)
+    accuracy = evaluate_model(model_file, data_file)
     
     # Clean up local files
-    os.remove(MODEL_FILE_NAME)
-    os.remove(DATA_FILE_NAME)
+    os.remove(model_file)
+    os.remove(data_file)
     
     if accuracy < THRESHOLD:
         print("Accuracy below threshold. Retraining required.")

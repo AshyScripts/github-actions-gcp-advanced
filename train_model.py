@@ -9,8 +9,10 @@ def download_from_gcs(bucket_name, source_blob_name, destination_file_name):
     client = storage.Client()
     bucket = client.bucket(bucket_name)
     blob = bucket.blob(source_blob_name)
-    blob.download_to_filename(destination_file_name)
-    print(f"Downloaded {source_blob_name} to {destination_file_name}")
+    full_path = os.path.join('/tmp', destination_file_name)
+    blob.download_to_filename(full_path)
+    print(f"Downloaded {source_blob_name} to {full_path}")
+    return full_path
 
 def train_model(data_file, model_file):
     """Train the model and save locally"""
@@ -19,8 +21,10 @@ def train_model(data_file, model_file):
     y = data['species']
     model = RandomForestClassifier(n_estimators=100, random_state=42)
     model.fit(X, y)
-    joblib.dump(model, model_file)
-    print(f"Model trained and saved to {model_file}")
+    full_path = os.path.join('/tmp', model_file)
+    joblib.dump(model, full_path)
+    print(f"Model trained and saved to {full_path}")
+    return full_path
 
 def upload_to_gcs(bucket_name, source_file_name, destination_blob_name):
     """Upload file to GCS bucket"""
@@ -38,14 +42,14 @@ if __name__ == "__main__":
     DATA_FILE_NAME = "iris_processed.csv"
 
     # Download processed data
-    download_from_gcs(BUCKET_NAME, PROCESSED_DATA_BLOB, DATA_FILE_NAME)
+    data_file = download_from_gcs(BUCKET_NAME, PROCESSED_DATA_BLOB, DATA_FILE_NAME)
     
     # Train model
-    train_model(DATA_FILE_NAME, MODEL_FILE_NAME)
+    model_file = train_model(data_file, MODEL_FILE_NAME)
     
     # Upload model to GCS
-    upload_to_gcs(BUCKET_NAME, MODEL_FILE_NAME, MODEL_BLOB_NAME)
+    upload_to_gcs(BUCKET_NAME, model_file, MODEL_BLOB_NAME)
     
     # Clean up local files
-    os.remove(MODEL_FILE_NAME)
-    os.remove(DATA_FILE_NAME)
+    os.remove(data_file)
+    os.remove(model_file)
