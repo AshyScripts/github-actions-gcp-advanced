@@ -5,7 +5,7 @@ on:
     branches: [ main ]
 
 jobs:
-  ci-cd:
+  test-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,6 +21,11 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install pytest
+
+    - name: Run tests
+      run: |
+        python -m pytest tests/
 
     - name: Authenticate to GCP
       uses: google-github-actions/auth@v1
@@ -65,11 +70,6 @@ jobs:
         REGION: us-east4
         REPOSITORY: model-docker-registry
       run: |
-        # Configure docker to use gcloud credentials
         gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
-        
-        # Build the image
         docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/model:latest .
-        
-        # Push the image
         docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/model:latest

@@ -29,12 +29,12 @@ def evaluate_model(model_file, data_file):
     return accuracy
 
 if __name__ == "__main__":
-    BUCKET_NAME = "bucket-demo-project"  # Your bucket name
+    BUCKET_NAME = "bucket-demo-project"
     MODEL_BLOB_NAME = "models/model.pkl"
     MODEL_FILE_NAME = "model.pkl"
     PROCESSED_DATA_BLOB = "processed_data/iris_processed.csv"
     DATA_FILE_NAME = "iris_processed.csv"
-    THRESHOLD = 0.999  # High threshold to trigger retraining
+    THRESHOLD = 0.999
 
     print("Starting model evaluation...")
     
