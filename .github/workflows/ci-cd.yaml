@@ -44,24 +44,30 @@ jobs:
       id: evaluate
       run: |
         echo "Starting model evaluation..."
+        # Remove any existing model file
         rm -f /tmp/model.pkl
-    
-        # Run evaluation and capture output
-        EVAL_OUTPUT=$(python evaluate_model.py 2>&1)
-        echo "Evaluation output:"
-        echo "$EVAL_OUTPUT"
-    
+
+        # Run evaluation and capture exit code
+        set +e  # Disable immediate exit on error
+        python evaluate_model.py
+        EXIT_CODE=$?
+        set -e  # Re-enable immediate exit on error
+
         # Check for errors or retraining conditions
-        if echo "$EVAL_OUTPUT" | grep -q "ModuleNotFoundError\|ImportError\|Accuracy below threshold\|No existing model found"; then
-          echo "Retraining condition met - setting RETRAIN=true"
-          echo "RETRAIN=true" >> $GITHUB_ENV
+        if [ $EXIT_CODE -ne 0 ]; then
+          echo "Evaluation failed with exit code $EXIT_CODE"
+          echo "retrain=true" >> $GITHUB_OUTPUT
         else
           echo "Model accuracy meets threshold - no retraining needed"
+          echo "retrain=false" >> $GITHUB_OUTPUT
         fi
+
+        # Exit with zero to prevent the step from failing
+        exit 0
 
 
     - name: Trigger Retraining
-      if: env.RETRAIN == 'true'
+      if: steps.evaluate.outputs.retrain == 'true'
       run: |
         echo "Starting retraining process..."
         ACCESS_TOKEN=$(gcloud auth print-identity-token)
@@ -73,7 +79,7 @@ jobs:
           https://us-east4-project-demo-1-439713.cloudfunctions.net/retrain_model
 
     - name: Build and Push Docker Image
-      if: env.RETRAIN == 'true'
+      if: steps.evaluate.outputs.retrain == 'true'
       env:
         PROJECT_ID: project-demo-1-439713
         REGION: us-east4
