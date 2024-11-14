@@ -46,15 +46,18 @@ jobs:
       continue-on-error: true
       run: |
         echo "Starting model evaluation..."
-        EVAL_OUTPUT=$(python evaluate_model.py 2>&1)
-        echo "Evaluation output:"
-        echo "$EVAL_OUTPUT"
-        if echo "$EVAL_OUTPUT" | grep -q "Accuracy below threshold\|No existing model found"; then
+        # Capture and display all output
+        python evaluate_model.py | tee eval_output.txt
+        
+        # Check the output file for retraining conditions
+        if grep -q "Accuracy.*below threshold\|No existing.*found\|Initial training required" eval_output.txt; then
           echo "Retraining condition met - setting RETRAIN=true"
           echo "RETRAIN=true" >> $GITHUB_ENV
+          cat eval_output.txt  # Display full output again for clarity
           exit 1
         else
           echo "Model accuracy meets threshold - no retraining needed"
+          cat eval_output.txt  # Display full output
         fi
 
     - name: Trigger Retraining

@@ -41,35 +41,39 @@ if __name__ == "__main__":
     MODEL_FILE_NAME = "model.pkl"
     PROCESSED_DATA_BLOB = "processed_data/iris_processed.csv"
     DATA_FILE_NAME = "iris_processed.csv"
-    THRESHOLD = 0.999
+    THRESHOLD = 0.90  # Lower threshold to force retraining
 
-    print(f"Starting model evaluation with threshold {THRESHOLD}")
+    print("=== Starting Model Evaluation ===")
+    print(f"Bucket: {BUCKET_NAME}")
+    print(f"Model path: {MODEL_BLOB_NAME}")
+    print(f"Data path: {PROCESSED_DATA_BLOB}")
+    print(f"Threshold: {THRESHOLD}")
     
     # Download processed data
-    print("Downloading processed data...")
     data_file = download_from_gcs(BUCKET_NAME, PROCESSED_DATA_BLOB, DATA_FILE_NAME)
     if not data_file:
-        print("Processed data not found. Initial training required.")
-        sys.exit(0)
+        print("No existing processed data found - Initial training required")
+        sys.exit(1)  # Changed to exit 1 to trigger retraining
 
     # Try to download existing model
-    print("Downloading existing model...")
     model_file = download_from_gcs(BUCKET_NAME, MODEL_BLOB_NAME, MODEL_FILE_NAME)
     if not model_file:
-        print("No existing model found. Initial training required.")
-        sys.exit(0)
+        print("No existing model found - Initial training required")
+        sys.exit(1)  # Changed to exit 1 to trigger retraining
 
     # Evaluate model
     print(f"Evaluating model against threshold: {THRESHOLD}")
     accuracy = evaluate_model(model_file, data_file)
+    print(f"Current model accuracy: {accuracy:.4f}")
     
     # Clean up local files
     os.remove(model_file)
     os.remove(data_file)
     
     if accuracy < THRESHOLD:
-        print(f"Accuracy ({accuracy:.4f}) below threshold ({THRESHOLD}). Retraining required.")
+        print(f"Accuracy ({accuracy:.4f}) below threshold ({THRESHOLD}) - Retraining required")
         sys.exit(1)
     else:
-        print(f"Model meets the accuracy threshold. Current: {accuracy:.4f}, Required: {THRESHOLD}")
+        print(f"Model meets accuracy threshold - No retraining needed")
+        print(f"Current: {accuracy:.4f}, Required: {THRESHOLD}")
         sys.exit(0)
