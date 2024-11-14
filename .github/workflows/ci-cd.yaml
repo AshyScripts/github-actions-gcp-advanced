@@ -45,25 +45,23 @@ jobs:
 
     - name: Evaluate Model
       id: evaluate
-      continue-on-error: true
       run: |
         echo "Starting model evaluation..."
-        # Remove any existing model file
         rm -f /tmp/model.pkl
-        
+    
         # Run evaluation and capture output
         EVAL_OUTPUT=$(python evaluate_model.py 2>&1)
         echo "Evaluation output:"
         echo "$EVAL_OUTPUT"
-        
+    
         # Check for errors or retraining conditions
         if echo "$EVAL_OUTPUT" | grep -q "ModuleNotFoundError\|ImportError\|Accuracy below threshold\|No existing model found"; then
           echo "Retraining condition met - setting RETRAIN=true"
           echo "RETRAIN=true" >> $GITHUB_ENV
-          exit 1
         else
           echo "Model accuracy meets threshold - no retraining needed"
         fi
+
 
     - name: Trigger Retraining
       if: env.RETRAIN == 'true'
