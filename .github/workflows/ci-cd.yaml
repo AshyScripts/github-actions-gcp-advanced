@@ -37,7 +37,7 @@ jobs:
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v1
       with:
-        project_id: your-project-id
+        project_id: project-demo-1-439713
         export_default_credentials: true
 
     - name: Run Data Processing
