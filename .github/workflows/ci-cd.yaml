@@ -20,8 +20,10 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
+        # Clean install of dependencies
+        pip uninstall -y numpy pandas scikit-learn
+        pip cache purge
         pip install -r requirements.txt
-        pip install pytest
 
     - name: Run tests
       run: |
@@ -46,18 +48,21 @@ jobs:
       continue-on-error: true
       run: |
         echo "Starting model evaluation..."
-        # Capture and display all output
-        python evaluate_model.py | tee eval_output.txt
+        # Remove any existing model file
+        rm -f /tmp/model.pkl
         
-        # Check the output file for retraining conditions
-        if grep -q "Accuracy.*below threshold\|No existing.*found\|Initial training required" eval_output.txt; then
+        # Run evaluation and capture output
+        EVAL_OUTPUT=$(python evaluate_model.py 2>&1)
+        echo "Evaluation output:"
+        echo "$EVAL_OUTPUT"
+        
+        # Check for errors or retraining conditions
+        if echo "$EVAL_OUTPUT" | grep -q "ModuleNotFoundError\|ImportError\|Accuracy below threshold\|No existing model found"; then
           echo "Retraining condition met - setting RETRAIN=true"
           echo "RETRAIN=true" >> $GITHUB_ENV
-          cat eval_output.txt  # Display full output again for clarity
           exit 1
         else
           echo "Model accuracy meets threshold - no retraining needed"
-          cat eval_output.txt  # Display full output
         fi
 
     - name: Trigger Retraining
@@ -65,14 +70,12 @@ jobs:
       run: |
         echo "Starting retraining process..."
         ACCESS_TOKEN=$(gcloud auth print-identity-token)
-        RESPONSE=$(curl -X POST \
+        curl -X POST \
           -H "Authorization: Bearer $ACCESS_TOKEN" \
           -H "Content-Type: application/json" \
           --max-time 30 \
           --verbose \
-          https://us-east4-project-demo-1-439713.cloudfunctions.net/retrain_model)
-        echo "Cloud Function Response:"
-        echo "$RESPONSE"
+          https://us-east4-project-demo-1-439713.cloudfunctions.net/retrain_model
 
     - name: Build and Push Docker Image
       if: env.RETRAIN == 'true'
@@ -82,20 +85,6 @@ jobs:
         REPOSITORY: model-docker-registry
       run: |
         echo "Starting Docker build and push..."
-        echo "Project ID: $PROJECT_ID"
-        echo "Region: $REGION"
-        echo "Repository: $REPOSITORY"
-        
-        echo "Checking GCP authentication..."
-        gcloud auth list
-        
-        # Configure docker with verbose logging
         gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
-        
-        # Build with verbose output
-        echo "Building Docker image..."
-        docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/model:latest . --progress=plain
-        
-        # Push with verbose output
-        echo "Pushing Docker image..."
-        docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/model:latest --verbose
+        docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/model:latest .
+        docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/model:latest
