@@ -1,6 +1,7 @@
 import pandas as pd
 from google.cloud import storage
 import os
+import numpy as np
 
 def download_data(bucket_name, source_blob_name, destination_file_name):
     """Download data from GCS bucket"""
@@ -15,11 +16,25 @@ def download_data(bucket_name, source_blob_name, destination_file_name):
 def preprocess_data(input_file, output_file):
     """Preprocess the data and save locally"""
     df = pd.read_csv(input_file)
+    
+    # Randomly select a drift factor between 0.05 and 0.2
+    drift_factor = np.random.uniform(0.05, 0.2)
+    print(f"Applying drift factor: {drift_factor:.4f}")
+    
+    df['sepal_length'] *= np.random.normal(1.0, drift_factor, size=len(df))
+    df['sepal_width'] *= np.random.normal(1.0, drift_factor, size=len(df))
+    df['petal_length'] *= np.random.normal(1.0, drift_factor, size=len(df))
+    df['petal_width'] *= np.random.normal(1.0, drift_factor, size=len(df))
+    
+    # Ensure no negative values
+    df[['sepal_length', 'sepal_width', 'petal_length', 'petal_width']] = df[['sepal_length', 'sepal_width', 'petal_length', 'petal_width']].clip(lower=0)
+    
     df = df.sample(frac=1).reset_index(drop=True)
     full_path = os.path.join('/tmp', output_file)
     df.to_csv(full_path, index=False)
     print(f"Preprocessed data saved to {full_path}")
     return full_path
+
 
 def upload_processed_data(bucket_name, source_file_name, destination_blob_name):
     """Upload processed data to GCS bucket"""
