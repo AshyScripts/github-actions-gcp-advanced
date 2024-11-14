@@ -20,9 +20,6 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        # Clean install of dependencies
-        pip uninstall -y numpy pandas scikit-learn
-        pip cache purge
         pip install -r requirements.txt
 
     - name: Run tests
