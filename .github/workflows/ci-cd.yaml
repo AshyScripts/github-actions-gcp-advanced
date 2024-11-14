@@ -45,23 +45,31 @@ jobs:
       id: evaluate
       continue-on-error: true
       run: |
+        echo "Starting model evaluation..."
         EVAL_OUTPUT=$(python evaluate_model.py 2>&1)
+        echo "Evaluation output:"
         echo "$EVAL_OUTPUT"
         if echo "$EVAL_OUTPUT" | grep -q "Accuracy below threshold\|No existing model found"; then
+          echo "Retraining condition met - setting RETRAIN=true"
           echo "RETRAIN=true" >> $GITHUB_ENV
           exit 1
+        else
+          echo "Model accuracy meets threshold - no retraining needed"
         fi
 
     - name: Trigger Retraining
       if: env.RETRAIN == 'true'
       run: |
+        echo "Starting retraining process..."
         ACCESS_TOKEN=$(gcloud auth print-identity-token)
-        curl -X POST \
+        RESPONSE=$(curl -X POST \
           -H "Authorization: Bearer $ACCESS_TOKEN" \
           -H "Content-Type: application/json" \
           --max-time 30 \
           --verbose \
-          https://us-east4-project-demo-1-439713.cloudfunctions.net/retrain_model
+          https://us-east4-project-demo-1-439713.cloudfunctions.net/retrain_model)
+        echo "Cloud Function Response:"
+        echo "$RESPONSE"
 
     - name: Build and Push Docker Image
       if: env.RETRAIN == 'true'
@@ -70,6 +78,21 @@ jobs:
         REGION: us-east4
         REPOSITORY: model-docker-registry
       run: |
+        echo "Starting Docker build and push..."
+        echo "Project ID: $PROJECT_ID"
+        echo "Region: $REGION"
+        echo "Repository: $REPOSITORY"
+        
+        echo "Checking GCP authentication..."
+        gcloud auth list
+        
+        # Configure docker with verbose logging
         gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
-        docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/model:latest .
-        docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/model:latest
+        
+        # Build with verbose output
+        echo "Building Docker image..."
+        docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/model:latest . --progress=plain
+        
+        # Push with verbose output
+        echo "Pushing Docker image..."
+        docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/model:latest --verbose
